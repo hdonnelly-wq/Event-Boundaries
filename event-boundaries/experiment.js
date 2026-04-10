@@ -5,23 +5,187 @@ const jsPsych = initJsPsych({
 });
 
 // --------------------
-// Random condition assignment
+// Random condition assignment: 2 x 2
 // --------------------
 const condition = jsPsych.randomization.sampleWithoutReplacement(
-  ["barrier", "no_barrier"],
+  [
+    "numbers_barrier",
+    "numbers_no_barrier",
+    "colors_barrier",
+    "colors_no_barrier"
+  ],
   1
 )[0];
 
+const stimulusType = condition.includes("numbers") ? "numbers" : "colors";
+const hasBarrier = condition.includes("barrier") && !condition.includes("no_barrier");
+
+
+// --------------------
+// Stimulus sets
+// --------------------
+const numberSequences = [
+  ["4", "7", "8", "3", "5", "2", "1", "6"], // Seq 1
+  ["5", "1", "8", "3", "7", "4", "2", "6"], // Seq 2
+  ["4", "5", "7", "1", "3", "8", "2", "6"], // Seq 3
+  ["4", "7", "3", "8", "1", "5", "2", "6"]  // Seq 4
+];
+
+const colorSequences = [
+  [
+    { name: "green",  hex: "#43a047", key: "g" },
+    { name: "pink",   hex: "#d81b60", key: "i" },
+    { name: "brown",  hex: "#6d4c41", key: "w" },
+    { name: "yellow", hex: "#fdd835", key: "y" },
+    { name: "blue",   hex: "#1e88e5", key: "b" },
+    { name: "orange", hex: "#fb8c00", key: "o" },
+    { name: "red",    hex: "#e53935", key: "r" },
+    { name: "purple", hex: "#8e24aa", key: "p" }
+  ],// Seq 1
+  [
+    { name: "blue",   hex: "#1e88e5", key: "b" },
+    { name: "red",    hex: "#e53935", key: "r" },
+    { name: "brown",  hex: "#6d4c41", key: "w" },
+    { name: "yellow", hex: "#fdd835", key: "y" },
+    { name: "pink",   hex: "#d81b60", key: "i" },
+    { name: "green",  hex: "#43a047", key: "g" },
+    { name: "orange", hex: "#fb8c00", key: "o" },
+    { name: "purple", hex: "#8e24aa", key: "p" }
+  ],// Seq 2
+  [
+    { name: "green",  hex: "#43a047", key: "g" },
+    { name: "blue",   hex: "#1e88e5", key: "b" },
+    { name: "pink",   hex: "#d81b60", key: "i" },
+    { name: "red",    hex: "#e53935", key: "r" },
+    { name: "yellow", hex: "#fdd835", key: "y" },
+    { name: "brown",  hex: "#6d4c41", key: "w" },
+    { name: "orange", hex: "#fb8c00", key: "o" },
+    { name: "purple", hex: "#8e24aa", key: "p" }
+  ],// Seq 3
+  [
+    { name: "green",  hex: "#43a047", key: "g" },
+    { name: "pink",   hex: "#d81b60", key: "i" },
+    { name: "yellow", hex: "#fdd835", key: "y" },
+    { name: "brown",  hex: "#6d4c41", key: "w" },
+    { name: "red",    hex: "#e53935", key: "r" },
+    { name: "blue",   hex: "#1e88e5", key: "b" },
+    { name: "orange", hex: "#fb8c00", key: "o" },
+    { name: "purple", hex: "#8e24aa", key: "p" }
+  ]// Seq 4
+];
+
+// --------------------
+// Choose one sequence for this participant
+// --------------------
+let sequenceIndex;
+let studyItems;
+
+if (stimulusType === "numbers") {
+  sequenceIndex = jsPsych.randomization.sampleWithoutReplacement([0, 1, 2, 3], 1)[0];
+  studyItems = numberSequences[sequenceIndex];
+} else {
+  sequenceIndex = jsPsych.randomization.sampleWithoutReplacement([0, 1, 2, 3], 1)[0];
+  studyItems = colorSequences[sequenceIndex];
+}
+
 jsPsych.data.addProperties({
-  condition: condition
+  condition: condition,
+  stimulus_type: stimulusType,
+  barrier_condition: hasBarrier ? "barrier" : "no_barrier",
+  sequence_id: sequenceIndex + 1
 });
 
 // --------------------
-// Sequence
+// Helpers
 // --------------------
-const sequence = [3, 7, 2, 1, 8, 4, 6, 5];
-const correctSequenceString = sequence.join("");
-const correctAfterEight = sequence[sequence.indexOf(8) + 1].toString();
+function getStudyStimulus(item) {
+  if (stimulusType === "numbers") {
+    return `
+      <div style="font-size: 48px; line-height: 1.6;">
+        <p>${item}</p>
+        <p style="font-size: 20px;">Press the matching number key.</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 24px;">
+      <div style="
+        width: 180px;
+        height: 180px;
+        background-color: ${item.hex};
+        border: 2px solid #222;
+      "></div>
+      <p style="font-size: 20px; margin: 0;">
+        Press <strong>${item.key.toUpperCase()}</strong> for ${item.name}.
+      </p>
+    </div>
+  `;
+}
+
+function getCorrectStudyChoice(item) {
+  return stimulusType === "numbers" ? item : item.key;
+}
+
+function getFullSequenceCorrectString() {
+  if (stimulusType === "numbers") {
+    return studyItems.join("");
+  }
+  return studyItems.map(c => c.name).join(",");
+}
+
+function normalizeRecallInput(input) {
+  if (stimulusType === "numbers") {
+    return input.replace(/\s+/g, "");
+  }
+
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/,+/g, ",");
+}
+
+function getFollowupCueLabel() {
+  if (stimulusType === "numbers") {
+    return studyItems[4];
+  }
+  return studyItems[4].name;
+}
+
+function getFollowupPrompt() {
+  return `What comes after ${getFollowupCueLabel()}?`;
+}
+
+function getCorrectFollowupResponse() {
+  if (stimulusType === "numbers") {
+    return studyItems[5];
+  }
+  return studyItems[5].name;
+}
+
+function getRecallInstructionsText() {
+  if (stimulusType === "numbers") {
+    return `
+      <p>Now type the full sequence in order.</p>
+      <p>Use only numbers, with no spaces or commas.</p>
+    `;
+  }
+
+  return `
+    <p>Now type the full color sequence in order.</p>
+    <p>Use color names separated by commas.</p>
+    <p>Example format: green,pink,brown,yellow</p>
+  `;
+}
+
+function getFollowupInstructionsText() {
+  if (stimulusType === "numbers") {
+    return `<p>Good.</p><p>Now answer one more question about the number sequence.</p>`;
+  }
+
+  return `<p>Good.</p><p>Now answer one more question about the color sequence.</p>`;
+}
 
 // --------------------
 // Welcome / condition display
@@ -31,15 +195,16 @@ const welcome = {
   stimulus: `
     <div style="font-size: 28px; line-height: 1.6;">
       <p>Welcome to the experiment.</p>
-      <p>When a number appears, press the number key that matches it.</p>
-      <p>After two memorization rounds, type the full sequence in order.</p>
-      <p>If you type it correctly, you will answer one follow-up question.</p>
+      <p>You will study a sequence of 8 ${stimulusType === "numbers" ? "numbers" : "colors"}.</p>
+      <p>After two memorization rounds, you will type the full sequence in order.</p>
+      <p>If that is correct, you will answer one follow-up question.</p>
       <p>If you get anything wrong, you will repeat the memorization rounds.</p>
-      <p><strong>Testing note:</strong> You were assigned to the <strong>${condition}</strong> condition.</p>
+      <p><strong>Testing note:</strong> You were assigned to <strong>${condition}</strong>, sequence <strong>${sequenceIndex + 1}</strong>.</p>
       <p>Press any key to begin.</p>
     </div>
   `
 };
+
 
 // --------------------
 // Barrier screen
@@ -78,30 +243,30 @@ function makeStudyRound(runNumber) {
     `
   });
 
-  for (let i = 0; i < sequence.length; i++) {
+  for (let i = 0; i < studyItems.length; i++) {
+    const item = studyItems[i];
+    const correctChoice = getCorrectStudyChoice(item);
+
     roundTimeline.push({
       type: jsPsychHtmlKeyboardResponse,
-      stimulus: `
-        <div style="font-size: 48px; line-height: 1.6;">
-          <p>${sequence[i]}</p>
-          <p style="font-size: 20px;">Press the matching number key.</p>
-        </div>
-      `,
-      choices: [sequence[i].toString()],
-      data: {
+      stimulus: getStudyStimulus(item),
+      choices: [correctChoice],
+        data: {
         phase: "study",
         study_run: runNumber,
         serial_position: i + 1,
-        number_shown: sequence[i],
-        correct_response: sequence[i].toString(),
-        condition: condition
-      },
+        item_label: stimulusType === "numbers" ? item : item.name,
+        correct_response: correctChoice,
+        stimulus_type: stimulusType,
+        condition: condition,
+        sequence_id: sequenceIndex + 1
+    },
       on_finish: function(data) {
         data.correct = data.response === data.correct_response;
       }
     });
 
-    if (condition === "barrier" && i === 3) {
+    if (hasBarrier && i === 3) {
       roundTimeline.push(barrierScreen);
     }
   }
@@ -124,8 +289,7 @@ const recallIntro = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
     <div style="font-size: 28px; line-height: 1.6;">
-      <p>Now type the full sequence in order.</p>
-      <p>Use only numbers, with no spaces or commas.</p>
+      ${getRecallInstructionsText()}
       <p>Press any key to continue.</p>
     </div>
   `
@@ -138,63 +302,72 @@ const recallTest = {
   type: jsPsychSurveyText,
   questions: [
     {
-      prompt: "Enter the full sequence in order:",
+      prompt: stimulusType === "numbers"
+        ? "Enter the full sequence in order:"
+        : "Enter the full color sequence in order:",
       name: "typed_sequence",
       rows: 1,
-      columns: 30,
+      columns: 40,
       required: true
     }
   ],
   button_label: "Submit",
   data: {
     phase: "recall",
-    correct_sequence: correctSequenceString
+    correct_sequence: getFullSequenceCorrectString(),
+    stimulus_type: stimulusType
   },
   on_finish: function(data) {
-    const typed = data.response.typed_sequence.trim();
-    data.typed_sequence = typed;
-    data.correct = typed === correctSequenceString;
+    const typedRaw = data.response.typed_sequence;
+    const typedNormalized = normalizeRecallInput(typedRaw);
+    const correctNormalized = normalizeRecallInput(getFullSequenceCorrectString());
+
+    data.typed_sequence = typedRaw;
+    data.typed_sequence_normalized = typedNormalized;
+    data.correct = typedNormalized === correctNormalized;
   }
 };
 
 // --------------------
 // Follow-up question intro
 // --------------------
-const afterEightIntro = {
+const followupIntro = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
     <div style="font-size: 28px; line-height: 1.6;">
-      <p>Good.</p>
-      <p>Now answer one more question about the sequence.</p>
+      ${getFollowupInstructionsText()}
       <p>Press any key to continue.</p>
     </div>
   `
 };
 
 // --------------------
-// Question: what comes after 8?
-// Only shown if recall was correct
+// Follow-up question: after 5th item
 // --------------------
-const afterEightQuestion = {
+const followupQuestion = {
   type: jsPsychSurveyText,
   questions: [
     {
-      prompt: "What comes after the number 8?",
-      name: "after_eight_response",
+      prompt: getFollowupPrompt(),
+      name: "followup_response",
       rows: 1,
-      columns: 10,
+      columns: 20,
       required: true
     }
   ],
   button_label: "Submit",
   data: {
-    phase: "after_eight",
-    correct_response: correctAfterEight
+    phase: "followup",
+    correct_response: getCorrectFollowupResponse(),
+    stimulus_type: stimulusType
   },
   on_finish: function(data) {
-    const typed = data.response.after_eight_response.trim();
-    data.after_eight_response = typed;
-    data.correct = typed === correctAfterEight;
+    const typedRaw = data.response.followup_response.trim();
+    const typedNormalized = typedRaw.toLowerCase().replace(/\s+/g, "");
+    const correctNormalized = getCorrectFollowupResponse().toLowerCase().replace(/\s+/g, "");
+
+    data.followup_response = typedRaw;
+    data.correct = typedNormalized === correctNormalized;
   }
 };
 
@@ -232,43 +405,38 @@ const memorizationAndTestLoop = {
     recallIntro,
     recallTest,
 
-    // Ask the "after 8" question only if full recall was correct
     {
-      timeline: [afterEightIntro, afterEightQuestion],
+      timeline: [followupIntro, followupQuestion],
       conditional_function: function() {
         const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
         return lastRecall && lastRecall.correct === true;
       }
     },
 
-    // Success only if recall was correct AND after-eight was correct
     {
       timeline: [successScreen],
       conditional_function: function() {
         const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
-        const lastAfterEight = jsPsych.data.get().filter({ phase: "after_eight" }).last(1).values()[0];
+        const lastFollowup = jsPsych.data.get().filter({ phase: "followup" }).last(1).values()[0];
 
         return lastRecall &&
                lastRecall.correct === true &&
-               lastAfterEight &&
-               lastAfterEight.correct === true;
+               lastFollowup &&
+               lastFollowup.correct === true;
       }
     },
 
-    // Retry if recall was wrong OR after-eight was wrong/missing
     {
       timeline: [retryScreen],
       conditional_function: function() {
         const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
-        const lastAfterEight = jsPsych.data.get().filter({ phase: "after_eight" }).last(1).values()[0];
+        const lastFollowup = jsPsych.data.get().filter({ phase: "followup" }).last(1).values()[0];
 
-        // if full recall is wrong, retry immediately
         if (!lastRecall || lastRecall.correct === false) {
           return true;
         }
 
-        // if full recall is right but after-eight is wrong, retry
-        if (!lastAfterEight || lastAfterEight.correct === false) {
+        if (!lastFollowup || lastFollowup.correct === false) {
           return true;
         }
 
@@ -279,19 +447,16 @@ const memorizationAndTestLoop = {
 
   loop_function: function() {
     const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
-    const lastAfterEight = jsPsych.data.get().filter({ phase: "after_eight" }).last(1).values()[0];
+    const lastFollowup = jsPsych.data.get().filter({ phase: "followup" }).last(1).values()[0];
 
-    // wrong full sequence -> repeat
     if (!lastRecall || lastRecall.correct === false) {
       return true;
     }
 
-    // right full sequence but wrong after-eight -> repeat
-    if (!lastAfterEight || lastAfterEight.correct === false) {
+    if (!lastFollowup || lastFollowup.correct === false) {
       return true;
     }
 
-    // both correct -> stop
     return false;
   }
 };
