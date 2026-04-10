@@ -4,7 +4,7 @@ const jsPsych = initJsPsych({
   }
 });
 
-const sequence = [3, 7, 2, 9, 5, 1, 8, 4, 6, 0];
+const sequence = [3, 7, 2, 9, 5, 1, 8, 4];
 const correctSequenceString = sequence.join("");
 const correctAfterOne = "8";
 
