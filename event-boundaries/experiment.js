@@ -9,8 +9,8 @@ const jsPsych = initJsPsych({
 // --------------------
 const condition = jsPsych.randomization.sampleWithoutReplacement(
   [
-    "numbers_barrier",
-    "numbers_no_barrier",
+    //"numbers_barrier",
+    //"numbers_no_barrier",
     "colors_barrier",
     "colors_no_barrier"
   ],
@@ -19,21 +19,15 @@ const condition = jsPsych.randomization.sampleWithoutReplacement(
 
 const stimulusType = condition.includes("numbers") ? "numbers" : "colors";
 const hasBarrier = condition.includes("barrier") && !condition.includes("no_barrier");
+const shouldRunColorBlindnessScreen =
+  condition === "colors_barrier" || condition === "colors_no_barrier";
 
 // --------------------
 // Color blindness screening
 // --------------------
-
-// Replace this with the actual path to your Ishihara-style test image
 const colorBlindnessImage = "img/colortest.jpeg";
-
-// Example correct answers for 6 plates.
-// Change these to match the numbers shown in your image(s).
 const colorBlindnessCorrectAnswers = ["7", "13", "16", "8", "12", "9"];
-
-// Require all 6 correct to pass.
-// Change this if you want a looser threshold.
-const colorBlindnessPassThreshold = 6;
+const colorBlindnessPassThreshold = 5;
 
 const colorBlindnessIntro = {
   type: jsPsychHtmlButtonResponse,
@@ -356,6 +350,37 @@ function getFollowupInstructionsText() {
     <p>You will now answer two questions about the sequence.</p>
     <p>Press any key to continue.</p>
   `;
+}
+
+function getColorCircleHtml(colorHex, label) {
+  return `
+    <div
+      aria-label="${label}"
+      style="
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background: ${colorHex};
+        border: 3px solid #333;
+        margin: 0 auto;
+      "
+    ></div>
+  `;
+}
+
+function getColorFollowupStimulusHtml(position) {
+  const item = studyItems[position - 1];
+  return `
+    <div style="text-align: center;">
+      <p style="font-size: 26px; margin-bottom: 18px;">What comes after this color?</p>
+      ${getColorCircleHtml(item.hex, item.name)}
+    </div>
+  `;
+}
+
+function getColorFollowupCorrectChoiceIndex(position) {
+  const correctName = getFollowupCorrectResponse(position);
+  return recallColorOptions.findIndex(color => color.name === correctName);
 }
 
 function getColorRecallChoicesHtml() {
@@ -699,18 +724,48 @@ const followupIntro = {
 // Follow-up question builder
 // --------------------
 function makeFollowupQuestion(probeInfo, questionNumber) {
-  return {
-    type: jsPsychSurveyText,
-    questions: [
-      {
-        prompt: getFollowupPrompt(probeInfo.cuePosition),
-        name: "followup_response",
-        rows: 1,
-        columns: 20,
-        required: true
+  if (stimulusType === "numbers") {
+    return {
+      type: jsPsychSurveyText,
+      questions: [
+        {
+          prompt: getFollowupPrompt(probeInfo.cuePosition),
+          name: "followup_response",
+          rows: 1,
+          columns: 20,
+          required: true
+        }
+      ],
+      button_label: "Submit",
+      data: {
+        phase: "followup",
+        followup_question_number: questionNumber,
+        followup_half: probeInfo.half,
+        cue_position: probeInfo.cuePosition,
+        cue_item: getFollowupCueLabel(probeInfo.cuePosition),
+        correct_response: getFollowupCorrectResponse(probeInfo.cuePosition),
+        stimulus_type: stimulusType
+      },
+      on_finish: function(data) {
+        const typedRaw = data.response.followup_response.trim();
+        const typedNormalized = normalizeFollowupInput(typedRaw);
+        const correctNormalized = normalizeFollowupInput(
+          getFollowupCorrectResponse(probeInfo.cuePosition)
+        );
+
+        data.followup_response = typedRaw;
+        data.correct = typedNormalized === correctNormalized;
       }
-    ],
-    button_label: "Submit",
+    };
+  }
+
+  return {
+    type: jsPsychCircleClickResponse,
+    stimulus: getColorFollowupStimulusHtml(probeInfo.cuePosition),
+    choices: recallColorOptions.map(color => getColorCircleHtml(color.hex, color.name)),
+    correct_choice: getColorFollowupCorrectChoiceIndex(probeInfo.cuePosition),
+    prompt: `<p style="font-size: 22px;">Click the color that came next in the sequence.</p>`,
+    circle_radius: 220,
     data: {
       phase: "followup",
       followup_question_number: questionNumber,
@@ -721,14 +776,8 @@ function makeFollowupQuestion(probeInfo, questionNumber) {
       stimulus_type: stimulusType
     },
     on_finish: function(data) {
-      const typedRaw = data.response.followup_response.trim();
-      const typedNormalized = normalizeFollowupInput(typedRaw);
-      const correctNormalized = normalizeFollowupInput(
-        getFollowupCorrectResponse(probeInfo.cuePosition)
-      );
-
-      data.followup_response = typedRaw;
-      data.correct = typedNormalized === correctNormalized;
+      const selectedColor = recallColorOptions[data.response_index];
+      data.followup_response = selectedColor ? selectedColor.name : "";
     }
   };
 }
@@ -808,7 +857,7 @@ const memorizationAndTestLoop = {
 jsPsych.run([
   welcomePage,
   enterFullscreen,
-  colorBlindnessScreeningBlock,
+  ...(shouldRunColorBlindnessScreen ? [colorBlindnessScreeningBlock] : []),
   instructionPage,
   memorizationIntro,
   memorizationAndTestLoop
