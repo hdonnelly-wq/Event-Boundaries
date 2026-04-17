@@ -9,8 +9,8 @@ const jsPsych = initJsPsych({
 // --------------------
 const condition = jsPsych.randomization.sampleWithoutReplacement(
   [
-    //"numbers_barrier",
-    //"numbers_no_barrier",
+    "numbers_barrier",
+    "numbers_no_barrier",
     "colors_barrier",
     "colors_no_barrier"
   ],
@@ -33,8 +33,9 @@ const colorBlindnessIntro = {
   type: jsPsychHtmlButtonResponse,
   stimulus: `
     <div style="font-size: 28px; line-height: 1.6; max-width: 900px; margin: auto;">
-      <p>You will now complete a brief color vision screening.</p>
+      <p>You will now complete a brief color vision screening. </p>
       <p>You will see an image and enter the number shown in each of the 6 boxes.</p>
+      <p>You will need to get 5 of the 6 questions correct.</p>
       <p>Please answer as accurately as possible.</p>
     </div>
   `,
@@ -213,14 +214,14 @@ const colorSequences = [
 ];
 
 const recallColorOptions = [
-  { name: "green",  hex: "#43a047" },
-  { name: "pink",   hex: "#d81b60" },
-  { name: "brown",  hex: "#6d4c41" },
-  { name: "yellow", hex: "#fdd835" },
-  { name: "blue",   hex: "#1e88e5" },
-  { name: "orange", hex: "#fb8c00" },
   { name: "red",    hex: "#e53935" },
-  { name: "purple", hex: "#8e24aa" }
+  { name: "pink",   hex: "#d81b60" },
+  { name: "orange", hex: "#fb8c00" },
+  { name: "yellow", hex: "#fdd835" },
+  { name: "green",  hex: "#43a047" },
+  { name: "blue",   hex: "#1e88e5" },
+  { name: "purple", hex: "#8e24aa" },
+  { name: "brown",  hex: "#6d4c41" }
 ];
 
 // --------------------
@@ -250,6 +251,12 @@ const followupOrder = jsPsych.randomization.shuffle([
   { half: "first", cuePosition: firstHalfCuePosition },
   { half: "second", cuePosition: secondHalfCuePosition }
 ]);
+
+const followupChoiceOrder = jsPsych.randomization.shuffle(
+  stimulusType === "numbers"
+    ? ["1", "2", "3", "4", "5", "6", "7", "8"]
+    : recallColorOptions.map(color => color.name)
+);
 
 jsPsych.data.addProperties({
   condition: condition,
@@ -300,10 +307,12 @@ function getFullSequenceCorrectString() {
 }
 
 function normalizeRecallInput(input) {
-  const cleaned = input.trim().toLowerCase();
+  const cleaned = String(input).trim().toLowerCase();
 
   if (stimulusType === "numbers") {
-    return cleaned.replace(/[^0-9]/g, "");
+    return cleaned
+      .replace(/[\s,]+/g, "")
+      .replace(/[^0-9]/g, "");
   }
 
   return cleaned.replace(/[^a-z]/g, "");
@@ -352,6 +361,37 @@ function getFollowupInstructionsText() {
   `;
 }
 
+function getNumberCircleHtml(numberLabel) {
+  return `
+    <div
+      aria-label="${numberLabel}"
+      style="
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background: white;
+        border: 3px solid #333;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 30px;
+        font-weight: 700;
+        margin: 0 auto;
+      "
+    >${numberLabel}</div>
+  `;
+}
+
+function getNumberFollowupStimulusHtml(position) {
+  const item = studyItems[position - 1];
+  return `
+    <div style="text-align: center;">
+      <p style="font-size: 26px; margin-bottom: 18px;">What comes after this number?</p>
+      ${getNumberCircleHtml(item)}
+    </div>
+  `;
+}
+
 function getColorCircleHtml(colorHex, label) {
   return `
     <div
@@ -380,7 +420,12 @@ function getColorFollowupStimulusHtml(position) {
 
 function getColorFollowupCorrectChoiceIndex(position) {
   const correctName = getFollowupCorrectResponse(position);
-  return recallColorOptions.findIndex(color => color.name === correctName);
+  return followupChoiceOrder.findIndex(choiceName => choiceName === correctName);
+}
+
+function getNumberFollowupCorrectChoiceIndex(position) {
+  const correctNumber = getFollowupCorrectResponse(position);
+  return followupChoiceOrder.findIndex(choiceNumber => choiceNumber === correctNumber);
 }
 
 function getColorRecallChoicesHtml() {
@@ -726,17 +771,12 @@ const followupIntro = {
 function makeFollowupQuestion(probeInfo, questionNumber) {
   if (stimulusType === "numbers") {
     return {
-      type: jsPsychSurveyText,
-      questions: [
-        {
-          prompt: getFollowupPrompt(probeInfo.cuePosition),
-          name: "followup_response",
-          rows: 1,
-          columns: 20,
-          required: true
-        }
-      ],
-      button_label: "Submit",
+      type: jsPsychCircleClickResponse,
+      stimulus: getNumberFollowupStimulusHtml(probeInfo.cuePosition),
+      choices: followupChoiceOrder.map(numberLabel => getNumberCircleHtml(numberLabel)),
+      correct_choice: getNumberFollowupCorrectChoiceIndex(probeInfo.cuePosition),
+      prompt: `<p style="font-size: 22px;">Click the number that came next in the sequence.</p>`,
+      circle_radius: 220,
       data: {
         phase: "followup",
         followup_question_number: questionNumber,
@@ -747,14 +787,8 @@ function makeFollowupQuestion(probeInfo, questionNumber) {
         stimulus_type: stimulusType
       },
       on_finish: function(data) {
-        const typedRaw = data.response.followup_response.trim();
-        const typedNormalized = normalizeFollowupInput(typedRaw);
-        const correctNormalized = normalizeFollowupInput(
-          getFollowupCorrectResponse(probeInfo.cuePosition)
-        );
-
-        data.followup_response = typedRaw;
-        data.correct = typedNormalized === correctNormalized;
+        const selectedNumber = followupChoiceOrder[data.response_index];
+        data.followup_response = selectedNumber || "";
       }
     };
   }
@@ -762,7 +796,10 @@ function makeFollowupQuestion(probeInfo, questionNumber) {
   return {
     type: jsPsychCircleClickResponse,
     stimulus: getColorFollowupStimulusHtml(probeInfo.cuePosition),
-    choices: recallColorOptions.map(color => getColorCircleHtml(color.hex, color.name)),
+    choices: followupChoiceOrder.map(choiceName => {
+      const color = recallColorOptions.find(option => option.name === choiceName);
+      return getColorCircleHtml(color.hex, color.name);
+    }),
     correct_choice: getColorFollowupCorrectChoiceIndex(probeInfo.cuePosition),
     prompt: `<p style="font-size: 22px;">Click the color that came next in the sequence.</p>`,
     circle_radius: 220,
@@ -776,8 +813,8 @@ function makeFollowupQuestion(probeInfo, questionNumber) {
       stimulus_type: stimulusType
     },
     on_finish: function(data) {
-      const selectedColor = recallColorOptions[data.response_index];
-      data.followup_response = selectedColor ? selectedColor.name : "";
+      const selectedColorName = followupChoiceOrder[data.response_index];
+      data.followup_response = selectedColorName || "";
     }
   };
 }
