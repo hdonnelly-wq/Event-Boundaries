@@ -9,9 +9,9 @@ const jsPsych = initJsPsych({
 // --------------------
 const condition = jsPsych.randomization.sampleWithoutReplacement(
   [
-    //"numbers_barrier",
-    //"numbers_no_barrier",
-    //"colors_barrier",
+    "numbers_barrier",
+    "numbers_no_barrier",
+    "colors_barrier",
     "colors_no_barrier"
   ],
   1
