@@ -243,7 +243,7 @@ if (stimulusType === "numbers") {
 // One from first half, one from second half
 // Cue positions must have a "next item"
 // --------------------
-const firstHalfCuePosition = jsPsych.randomization.sampleWithoutReplacement([2, 3, 4], 1)[0];
+const firstHalfCuePosition = jsPsych.randomization.sampleWithoutReplacement([1, 2, 3], 1)[0];
 const secondHalfCuePosition = jsPsych.randomization.sampleWithoutReplacement([5, 6, 7], 1)[0];
 
 // Randomize order of the two follow-up questions
