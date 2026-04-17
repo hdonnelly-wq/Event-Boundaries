@@ -9,9 +9,9 @@ const jsPsych = initJsPsych({
 // --------------------
 const condition = jsPsych.randomization.sampleWithoutReplacement(
   [
-    "numbers_barrier",
-    "numbers_no_barrier",
-    "colors_barrier",
+    //"numbers_barrier",
+    //"numbers_no_barrier",
+    //"colors_barrier",
     "colors_no_barrier"
   ],
   1
@@ -218,6 +218,17 @@ const colorSequences = [
   ] // Seq 4
 ];
 
+const recallColorOptions = [
+  { name: "green",  hex: "#43a047" },
+  { name: "pink",   hex: "#d81b60" },
+  { name: "brown",  hex: "#6d4c41" },
+  { name: "yellow", hex: "#fdd835" },
+  { name: "blue",   hex: "#1e88e5" },
+  { name: "orange", hex: "#fb8c00" },
+  { name: "red",    hex: "#e53935" },
+  { name: "purple", hex: "#8e24aa" }
+];
+
 // --------------------
 // Choose one sequence for this participant
 // --------------------
@@ -313,10 +324,10 @@ function getRecallInstructionsText() {
   }
 
   return `
-    <p>Now type the full color sequence in order.</p>
-    <p>You may separate color names with spaces or commas if you want.</p>
-    <p>Capitalization does not matter.</p>
-    `;
+    <p>Now recreate the full color sequence in order.</p>
+    <p>Click the colored boxes one by one in the order you remember.</p>
+    <p>If you make a mistake, you can clear your response and start again.</p>
+  `;
 }
 
 function getItemLabelAtPosition(position) {
@@ -346,6 +357,69 @@ function getFollowupInstructionsText() {
     <p>Press any key to continue.</p>
   `;
 }
+
+function getColorRecallChoicesHtml() {
+  return recallColorOptions.map(color => `
+    <button
+      type="button"
+      data-color-name="${color.name}"
+      onclick="window.handleColorRecallClick('${color.name}')"
+      style="
+        width: 150px;
+        height: 90px;
+        background-color: ${color.hex};
+        border: 3px solid #222;
+        border-radius: 10px;
+        cursor: pointer;
+      "
+      aria-label="${color.name}"
+    ></button>
+  `).join("");
+}
+
+function updateColorRecallDisplay() {
+  const hiddenInput = document.querySelector('#color_recall_hidden_input');
+  const display = document.querySelector('#color_recall_selected_sequence');
+
+  if (!hiddenInput || !display) {
+    return;
+  }
+
+  hiddenInput.value = window.colorRecallSelection.join(',');
+
+  if (window.colorRecallSelection.length === 0) {
+    display.innerHTML = '<span style="color: #666;">No colors selected yet.</span>';
+  } else {
+    display.textContent = window.colorRecallSelection.join(' → ');
+  }
+
+  const buttons = document.querySelectorAll('[data-color-name]');
+  buttons.forEach(button => {
+    const colorName = button.getAttribute('data-color-name');
+    const alreadyChosen = window.colorRecallSelection.includes(colorName);
+    button.disabled = alreadyChosen;
+    button.style.opacity = alreadyChosen ? '0.45' : '1';
+    button.style.cursor = alreadyChosen ? 'not-allowed' : 'pointer';
+  });
+}
+
+window.handleColorRecallClick = function(colorName) {
+  if (!window.colorRecallSelection) {
+    window.colorRecallSelection = [];
+  }
+
+  if (window.colorRecallSelection.includes(colorName)) {
+    return;
+  }
+
+  window.colorRecallSelection.push(colorName);
+  updateColorRecallDisplay();
+};
+
+window.clearColorRecallSelection = function() {
+  window.colorRecallSelection = [];
+  updateColorRecallDisplay();
+};
 
 // --------------------
 // Welcome / instructions
@@ -511,35 +585,103 @@ const colorRecallPilot = {
 // --------------------
 // Full sequence recall
 // --------------------
-const recallTest = {
-  type: jsPsychSurveyText,
-  questions: [
-    {
-      prompt: stimulusType === "numbers"
-        ? "Enter the full sequence in order:"
-        : "Enter the full color sequence in order:",
-      name: "typed_sequence",
-      rows: 1,
-      columns: 40,
-      required: true
-    }
-  ],
-  button_label: "Submit",
-  data: {
-    phase: "recall",
-    correct_sequence: getFullSequenceCorrectString(),
-    stimulus_type: stimulusType
-  },
-  on_finish: function(data) {
-    const typedRaw = data.response.typed_sequence;
-    const typedNormalized = normalizeRecallInput(typedRaw);
-    const correctNormalized = normalizeRecallInput(getFullSequenceCorrectString());
+const recallTest = stimulusType === "numbers"
+  ? {
+      type: jsPsychSurveyText,
+      questions: [
+        {
+          prompt: "Enter the full sequence in order:",
+          name: "typed_sequence",
+          rows: 1,
+          columns: 40,
+          required: true
+        }
+      ],
+      button_label: "Submit",
+      data: {
+        phase: "recall",
+        correct_sequence: getFullSequenceCorrectString(),
+        stimulus_type: stimulusType
+      },
+      on_finish: function(data) {
+        const typedRaw = data.response.typed_sequence;
+        const typedNormalized = normalizeRecallInput(typedRaw);
+        const correctNormalized = normalizeRecallInput(getFullSequenceCorrectString());
 
-    data.typed_sequence = typedRaw;
-    data.typed_sequence_normalized = typedNormalized;
-    data.correct = typedNormalized === correctNormalized;
-  }
-};
+        data.typed_sequence = typedRaw;
+        data.typed_sequence_normalized = typedNormalized;
+        data.correct = typedNormalized === correctNormalized;
+      }
+    }
+  : {
+      type: jsPsychSurveyHtmlForm,
+      preamble: `
+        <div style="max-width: 1000px; margin: auto; font-size: 24px; line-height: 1.5;">
+          <p>Click the colors in the order you remember them.</p>
+          <p>Each color can be selected only once.</p>
+        </div>
+      `,
+      html: `
+        <div style="max-width: 950px; margin: 0 auto; text-align: center;">
+          <div
+            id="color_recall_selected_sequence"
+            style="
+              min-height: 40px;
+              margin-bottom: 22px;
+              font-size: 24px;
+              font-weight: 600;
+            "
+          >
+            <span style="color: #666;">No colors selected yet.</span>
+          </div>
+
+          <input
+            id="color_recall_hidden_input"
+            name="typed_sequence"
+            type="hidden"
+            value=""
+            required
+            pattern="(.+,){7}.+"
+          >
+
+          <div style="display: grid; grid-template-columns: repeat(4, 150px); gap: 18px; justify-content: center; margin-bottom: 24px;">
+            ${getColorRecallChoicesHtml()}
+          </div>
+
+          <button
+            type="button"
+            onclick="window.clearColorRecallSelection()"
+            style="font-size: 20px; padding: 10px 18px; margin-top: 8px;"
+          >
+            Clear response
+          </button>
+        </div>
+      `,
+      button_label: "Submit",
+      data: {
+        phase: "recall",
+        correct_sequence: getFullSequenceCorrectString(),
+        stimulus_type: stimulusType
+      },
+      on_load: function() {
+        window.colorRecallSelection = [];
+        updateColorRecallDisplay();
+      },
+      on_finish: function(data) {
+        const typedRaw = Array.isArray(window.colorRecallSelection)
+          ? window.colorRecallSelection.join(',')
+          : '';
+        const typedNormalized = normalizeRecallInput(typedRaw);
+        const correctNormalized = normalizeRecallInput(getFullSequenceCorrectString());
+
+        data.response = {
+          typed_sequence: typedRaw
+        };
+        data.typed_sequence = typedRaw;
+        data.typed_sequence_normalized = typedNormalized;
+        data.correct = typedNormalized === correctNormalized;
+      }
+    };
 
 // --------------------
 // Follow-up question intro
