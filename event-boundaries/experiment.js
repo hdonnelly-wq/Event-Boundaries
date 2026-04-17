@@ -21,6 +21,151 @@ const stimulusType = condition.includes("numbers") ? "numbers" : "colors";
 const hasBarrier = condition.includes("barrier") && !condition.includes("no_barrier");
 
 // --------------------
+// Color blindness screening
+// --------------------
+
+// Replace this with the actual path to your Ishihara-style test image
+const colorBlindnessImage = "img/colortest.jpeg";
+
+// Example correct answers for 6 plates.
+// Change these to match the numbers shown in your image(s).
+const colorBlindnessCorrectAnswers = ["7", "13", "16", "8", "12", "9"];
+
+// Require all 6 correct to pass.
+// Change this if you want a looser threshold.
+const colorBlindnessPassThreshold = 6;
+
+const colorBlindnessIntro = {
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <div style="font-size: 28px; line-height: 1.6; max-width: 900px; margin: auto;">
+      <p>You will now complete a brief color vision screening.</p>
+      <p>You will see an image and enter the number shown in each of the 6 boxes.</p>
+      <p>Please answer as accurately as possible.</p>
+    </div>
+  `,
+  choices: ["Begin color vision test"]
+};
+
+const colorBlindnessTest = {
+  type: jsPsychSurveyHtmlForm,
+  preamble: `
+    <div style="max-width: 1000px; margin: auto; font-size: 24px; line-height: 1.5;">
+      <p>Look at the image below and enter the number shown for each item. </p>
+      <img 
+        src="${colorBlindnessImage}" 
+        alt="Color blindness screening image" 
+        style="max-width: 700px; width: 100%; height: auto; margin: 20px 0; border: 2px solid #333;"
+      />
+    </div>
+  `,
+  html: `
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; max-width: 700px; margin: 0 auto; font-size: 22px; text-align: left;">
+      <div>
+        <label for="cb_1">Top Left:</label><br>
+        <input id="cb_1" name="cb_1" type="text" required style="font-size: 22px; width: 100%; padding: 8px;">
+      </div>
+      <div>
+        <label for="cb_2">Top Middle:</label><br>
+        <input id="cb_2" name="cb_2" type="text" required style="font-size: 22px; width: 100%; padding: 8px;">
+      </div>
+      <div>
+        <label for="cb_3">Top Right:</label><br>
+        <input id="cb_3" name="cb_3" type="text" required style="font-size: 22px; width: 100%; padding: 8px;">
+      </div>
+      <div>
+        <label for="cb_4">Bottom Left:</label><br>
+        <input id="cb_4" name="cb_4" type="text" required style="font-size: 22px; width: 100%; padding: 8px;">
+      </div>
+      <div>
+        <label for="cb_5">Bottom Middle:</label><br>
+        <input id="cb_5" name="cb_5" type="text" required style="font-size: 22px; width: 100%; padding: 8px;">
+      </div>
+      <div>
+        <label for="cb_6">Bottom Right:</label><br>
+        <input id="cb_6" name="cb_6" type="text" required style="font-size: 22px; width: 100%; padding: 8px;">
+      </div>
+    </div>
+  `,
+  button_label: "Submit screening",
+  data: {
+    phase: "color_blindness_screen"
+  },
+  on_finish: function(data) {
+    const responses = data.response;
+
+    const typedAnswers = [
+      responses.cb_1?.trim() || "",
+      responses.cb_2?.trim() || "",
+      responses.cb_3?.trim() || "",
+      responses.cb_4?.trim() || "",
+      responses.cb_5?.trim() || "",
+      responses.cb_6?.trim() || ""
+    ];
+
+    const cleanedTyped = typedAnswers.map(x => x.toLowerCase());
+    const cleanedCorrect = colorBlindnessCorrectAnswers.map(x => x.toLowerCase());
+
+    const itemCorrect = cleanedTyped.map((ans, i) => ans === cleanedCorrect[i]);
+    const totalCorrect = itemCorrect.filter(Boolean).length;
+    const passed = totalCorrect >= colorBlindnessPassThreshold;
+
+    data.typed_answers = typedAnswers;
+    data.correct_answers = colorBlindnessCorrectAnswers;
+    data.item_correct = itemCorrect;
+    data.total_correct = totalCorrect;
+    data.passed = passed;
+  }
+};
+
+const colorBlindnessPassScreen = {
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <div style="font-size: 30px; line-height: 1.6;">
+      <p>Pass</p>
+      <p>You may continue to the experiment.</p>
+    </div>
+  `,
+  choices: ["Continue"]
+};
+
+const colorBlindnessFailScreen = {
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <div style="font-size: 30px; line-height: 1.6;">
+      <p>Fail</p>
+      <p>Unfortunately, you are not eligible to continue with this experiment.</p>
+      <p>The experiment will now end.</p>
+    </div>
+  `,
+  choices: ["End experiment"],
+  on_finish: function() {
+    jsPsych.endExperiment("Screening failed.");
+  }
+};
+
+const colorBlindnessScreeningBlock = {
+  timeline: [
+    colorBlindnessIntro,
+    colorBlindnessTest,
+    {
+      timeline: [colorBlindnessPassScreen],
+      conditional_function: function() {
+        const lastScreen = jsPsych.data.get().filter({ phase: "color_blindness_screen" }).last(1).values()[0];
+        return lastScreen && lastScreen.passed === true;
+      }
+    },
+    {
+      timeline: [colorBlindnessFailScreen],
+      conditional_function: function() {
+        const lastScreen = jsPsych.data.get().filter({ phase: "color_blindness_screen" }).last(1).values()[0];
+        return lastScreen && lastScreen.passed === false;
+      }
+    }
+  ]
+};
+
+// --------------------
 // Stimulus sets
 // --------------------
 const numberSequences = [
@@ -521,6 +666,7 @@ const memorizationAndTestLoop = {
 jsPsych.run([
   welcomePage,
   enterFullscreen,
+  colorBlindnessScreeningBlock,
   instructionPage,
   memorizationIntro,
   memorizationAndTestLoop
