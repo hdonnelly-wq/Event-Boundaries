@@ -341,6 +341,28 @@ const recallIntro = {
   `
 };
 
+const colorRecallPilot = {
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <div style="font-size: 24px; line-height: 1.6; margin-bottom: 20px;">
+      <p>Click the colors in the order they appeared.</p>
+    </div>
+  `,
+  choices: studyItems.map(item => item.hex),
+  button_html: function(choice) {
+    return `
+      <button class="jspsych-btn" style="
+        width: 120px;
+        height: 120px;
+        margin: 8px;
+        background-color: ${choice};
+        border: 2px solid #222;
+        cursor: pointer;
+      "></button>
+    `;
+  }
+};
+
 // --------------------
 // Full sequence recall
 // --------------------
@@ -434,7 +456,6 @@ const successScreen = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
     <div style="font-size: 30px; line-height: 1.6;">
-      <p>Correct.</p>
       <p>You completed the task successfully.</p>
       <p>Press any key to finish.</p>
     </div>
@@ -468,57 +489,33 @@ const memorizationAndTestLoop = {
       }
     },
     {
-      timeline: [successScreen],
-      conditional_function: function() {
-        const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
-        const lastTwoFollowups = jsPsych.data.get().filter({ phase: "followup" }).last(2).values();
-
-        return lastRecall &&
-               lastRecall.correct === true &&
-               lastTwoFollowups.length === 2 &&
-               lastTwoFollowups.every(trial => trial.correct === true);
-      }
-    },
-    {
-      timeline: [retryScreen],
-      conditional_function: function() {
-        const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
-        const lastTwoFollowups = jsPsych.data.get().filter({ phase: "followup" }).last(2).values();
-
-        if (!lastRecall || lastRecall.correct === false) {
-          return true;
-        }
-
-        if (lastTwoFollowups.length < 2) {
-          return true;
-        }
-
-        if (!lastTwoFollowups.every(trial => trial.correct === true)) {
-          return true;
-        }
-
-        return false;
-      }
-    }
-  ],
-  loop_function: function() {
+  timeline: [successScreen],
+  conditional_function: function() {
     const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
     const lastTwoFollowups = jsPsych.data.get().filter({ phase: "followup" }).last(2).values();
 
-    if (!lastRecall || lastRecall.correct === false) {
-      return true;
-    }
-
-    if (lastTwoFollowups.length < 2) {
-      return true;
-    }
-
-    if (!lastTwoFollowups.every(trial => trial.correct === true)) {
-      return true;
-    }
-
-    return false;
+    return lastRecall &&
+           lastRecall.correct === true &&
+           lastTwoFollowups.length === 2;
   }
+},
+   {
+  timeline: [retryScreen],
+  conditional_function: function() {
+    const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
+    return !lastRecall || lastRecall.correct === false;
+  }
+}
+  ],
+  loop_function: function() {
+  const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
+
+  if (!lastRecall || lastRecall.correct === false) {
+    return true;
+  }
+
+  return false;
+}
 };
 
 jsPsych.run([
