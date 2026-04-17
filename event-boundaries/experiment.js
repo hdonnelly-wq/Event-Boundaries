@@ -20,7 +20,6 @@ const condition = jsPsych.randomization.sampleWithoutReplacement(
 const stimulusType = condition.includes("numbers") ? "numbers" : "colors";
 const hasBarrier = condition.includes("barrier") && !condition.includes("no_barrier");
 
-
 // --------------------
 // Stimulus sets
 // --------------------
@@ -41,7 +40,7 @@ const colorSequences = [
     { name: "orange", hex: "#fb8c00", key: "o" },
     { name: "red",    hex: "#e53935", key: "r" },
     { name: "purple", hex: "#8e24aa", key: "p" }
-  ],// Seq 1
+  ], // Seq 1
   [
     { name: "blue",   hex: "#1e88e5", key: "b" },
     { name: "red",    hex: "#e53935", key: "r" },
@@ -51,7 +50,7 @@ const colorSequences = [
     { name: "green",  hex: "#43a047", key: "g" },
     { name: "orange", hex: "#fb8c00", key: "o" },
     { name: "purple", hex: "#8e24aa", key: "p" }
-  ],// Seq 2
+  ], // Seq 2
   [
     { name: "green",  hex: "#43a047", key: "g" },
     { name: "blue",   hex: "#1e88e5", key: "b" },
@@ -61,7 +60,7 @@ const colorSequences = [
     { name: "brown",  hex: "#6d4c41", key: "w" },
     { name: "orange", hex: "#fb8c00", key: "o" },
     { name: "purple", hex: "#8e24aa", key: "p" }
-  ],// Seq 3
+  ], // Seq 3
   [
     { name: "green",  hex: "#43a047", key: "g" },
     { name: "pink",   hex: "#d81b60", key: "i" },
@@ -71,7 +70,7 @@ const colorSequences = [
     { name: "blue",   hex: "#1e88e5", key: "b" },
     { name: "orange", hex: "#fb8c00", key: "o" },
     { name: "purple", hex: "#8e24aa", key: "p" }
-  ]// Seq 4
+  ] // Seq 4
 ];
 
 // --------------------
@@ -88,11 +87,27 @@ if (stimulusType === "numbers") {
   studyItems = colorSequences[sequenceIndex];
 }
 
+// --------------------
+// Random follow-up cue positions
+// One from first half, one from second half
+// Cue positions must have a "next item"
+// --------------------
+const firstHalfCuePosition = jsPsych.randomization.sampleWithoutReplacement([2, 3, 4], 1)[0];
+const secondHalfCuePosition = jsPsych.randomization.sampleWithoutReplacement([5, 6, 7], 1)[0];
+
+// Randomize order of the two follow-up questions
+const followupOrder = jsPsych.randomization.shuffle([
+  { half: "first", cuePosition: firstHalfCuePosition },
+  { half: "second", cuePosition: secondHalfCuePosition }
+]);
+
 jsPsych.data.addProperties({
   condition: condition,
   stimulus_type: stimulusType,
   barrier_condition: hasBarrier ? "barrier" : "no_barrier",
-  sequence_id: sequenceIndex + 1
+  sequence_id: sequenceIndex + 1,
+  first_half_cue_position: firstHalfCuePosition,
+  second_half_cue_position: secondHalfCuePosition
 });
 
 // --------------------
@@ -103,7 +118,7 @@ function getStudyStimulus(item) {
     return `
       <div style="font-size: 48px; line-height: 1.6;">
         <p>${item}</p>
-        <p style="font-size: 20px;">Press the matching number key.</p>
+        <p style="font-size: 20px;">Press any key to continue.</p>
       </div>
     `;
   }
@@ -117,7 +132,7 @@ function getStudyStimulus(item) {
         border: 2px solid #222;
       "></div>
       <p style="font-size: 20px; margin: 0;">
-        Press <strong>${item.key.toUpperCase()}</strong> for ${item.name}.
+        Press any key to continue.
       </p>
     </div>
   `;
@@ -135,76 +150,108 @@ function getFullSequenceCorrectString() {
 }
 
 function normalizeRecallInput(input) {
+  const cleaned = input.trim().toLowerCase();
+
   if (stimulusType === "numbers") {
-    return input.replace(/\s+/g, "");
+    return cleaned.replace(/[^0-9]/g, "");
   }
 
-  return input
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/,+/g, ",");
-}
-
-function getFollowupCueLabel() {
-  if (stimulusType === "numbers") {
-    return studyItems[4];
-  }
-  return studyItems[4].name;
-}
-
-function getFollowupPrompt() {
-  return `What comes after ${getFollowupCueLabel()}?`;
-}
-
-function getCorrectFollowupResponse() {
-  if (stimulusType === "numbers") {
-    return studyItems[5];
-  }
-  return studyItems[5].name;
+  return cleaned.replace(/[^a-z]/g, "");
 }
 
 function getRecallInstructionsText() {
   if (stimulusType === "numbers") {
     return `
       <p>Now type the full sequence in order.</p>
-      <p>Use only numbers, with no spaces or commas.</p>
+      <p>You may use spaces or commas if you want.</p>
     `;
   }
 
   return `
     <p>Now type the full color sequence in order.</p>
-    <p>Use color names separated by commas.</p>
-    <p>Example format: green,pink,brown,yellow</p>
-  `;
+    <p>You may separate color names with spaces or commas if you want.</p>
+    <p>Capitalization does not matter.</p>
+    `;
+}
+
+function getItemLabelAtPosition(position) {
+  const item = studyItems[position - 1];
+  return stimulusType === "numbers" ? item : item.name;
+}
+
+function getFollowupCueLabel(position) {
+  return getItemLabelAtPosition(position);
+}
+
+function getFollowupPrompt(position) {
+  return `What comes after ${getFollowupCueLabel(position)}?`;
+}
+
+function getFollowupCorrectResponse(position) {
+  return getItemLabelAtPosition(position + 1);
+}
+
+function normalizeFollowupInput(input) {
+  return input.trim().toLowerCase().replace(/\s+/g, "");
 }
 
 function getFollowupInstructionsText() {
-  if (stimulusType === "numbers") {
-    return `<p>Good.</p><p>Now answer one more question about the number sequence.</p>`;
-  }
-
-  return `<p>Good.</p><p>Now answer one more question about the color sequence.</p>`;
+  return `
+    <p>You will now answer two questions about the sequence.</p>
+    <p>Press any key to continue.</p>
+  `;
 }
 
 // --------------------
-// Welcome / condition display
+// Welcome / instructions
 // --------------------
-const welcome = {
+const welcomePage = {
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <div style="font-size: 32px; line-height: 1.6;">
+      <p>Welcome to the experiment.</p>
+    </div>
+  `,
+  choices: ["Continue"]
+};
+
+const enterFullscreen = {
+  type: jsPsychFullscreen,
+  fullscreen_mode: true,
+  message: `
+    <div style="font-size: 28px; line-height: 1.6;">
+      <p>The experiment will now switch to full screen mode.</p>
+      <p>Please click the button below to continue.</p>
+    </div>
+  `,
+  button_label: "Enter Full Screen",
+  delay_after: 500
+};
+
+const instructionPage = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
     <div style="font-size: 28px; line-height: 1.6;">
-      <p>Welcome to the experiment.</p>
       <p>You will study a sequence of 8 ${stimulusType === "numbers" ? "numbers" : "colors"}.</p>
       <p>After two memorization rounds, you will type the full sequence in order.</p>
-      <p>If that is correct, you will answer one follow-up question.</p>
+      <p>If that is correct, you will answer two follow-up questions.</p>
       <p>If you get anything wrong, you will repeat the memorization rounds.</p>
-      <p><strong>Testing note:</strong> You were assigned to <strong>${condition}</strong>, sequence <strong>${sequenceIndex + 1}</strong>.</p>
       <p>Press any key to begin.</p>
     </div>
   `
 };
 
+const memorizationIntro = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <div style="font-size: 32px; line-height: 1.6;">
+      <p>${stimulusType === "numbers"
+        ? "You will be shown a sequence of numbers one by one. Memorize them in order."
+        : "You will be shown a sequence of colors one by one. Memorize them in order."}</p>
+      <p>Press any key to continue.</p>
+    </div>
+  `
+};
 
 // --------------------
 // Barrier screen
@@ -245,24 +292,23 @@ function makeStudyRound(runNumber) {
 
   for (let i = 0; i < studyItems.length; i++) {
     const item = studyItems[i];
-    const correctChoice = getCorrectStudyChoice(item);
 
     roundTimeline.push({
       type: jsPsychHtmlKeyboardResponse,
       stimulus: getStudyStimulus(item),
-      choices: [correctChoice],
-        data: {
+      choices: "ALL_KEYS",
+      data: {
         phase: "study",
         study_run: runNumber,
         serial_position: i + 1,
         item_label: stimulusType === "numbers" ? item : item.name,
-        correct_response: correctChoice,
+        correct_response: "",
         stimulus_type: stimulusType,
         condition: condition,
         sequence_id: sequenceIndex + 1
-    },
+      },
       on_finish: function(data) {
-        data.correct = data.response === data.correct_response;
+        data.correct = true;
       }
     });
 
@@ -336,40 +382,50 @@ const followupIntro = {
   stimulus: `
     <div style="font-size: 28px; line-height: 1.6;">
       ${getFollowupInstructionsText()}
-      <p>Press any key to continue.</p>
     </div>
   `
 };
 
 // --------------------
-// Follow-up question: after 5th item
+// Follow-up question builder
 // --------------------
-const followupQuestion = {
-  type: jsPsychSurveyText,
-  questions: [
-    {
-      prompt: getFollowupPrompt(),
-      name: "followup_response",
-      rows: 1,
-      columns: 20,
-      required: true
-    }
-  ],
-  button_label: "Submit",
-  data: {
-    phase: "followup",
-    correct_response: getCorrectFollowupResponse(),
-    stimulus_type: stimulusType
-  },
-  on_finish: function(data) {
-    const typedRaw = data.response.followup_response.trim();
-    const typedNormalized = typedRaw.toLowerCase().replace(/\s+/g, "");
-    const correctNormalized = getCorrectFollowupResponse().toLowerCase().replace(/\s+/g, "");
+function makeFollowupQuestion(probeInfo, questionNumber) {
+  return {
+    type: jsPsychSurveyText,
+    questions: [
+      {
+        prompt: getFollowupPrompt(probeInfo.cuePosition),
+        name: "followup_response",
+        rows: 1,
+        columns: 20,
+        required: true
+      }
+    ],
+    button_label: "Submit",
+    data: {
+      phase: "followup",
+      followup_question_number: questionNumber,
+      followup_half: probeInfo.half,
+      cue_position: probeInfo.cuePosition,
+      cue_item: getFollowupCueLabel(probeInfo.cuePosition),
+      correct_response: getFollowupCorrectResponse(probeInfo.cuePosition),
+      stimulus_type: stimulusType
+    },
+    on_finish: function(data) {
+      const typedRaw = data.response.followup_response.trim();
+      const typedNormalized = normalizeFollowupInput(typedRaw);
+      const correctNormalized = normalizeFollowupInput(
+        getFollowupCorrectResponse(probeInfo.cuePosition)
+      );
 
-    data.followup_response = typedRaw;
-    data.correct = typedNormalized === correctNormalized;
-  }
-};
+      data.followup_response = typedRaw;
+      data.correct = typedNormalized === correctNormalized;
+    }
+  };
+}
+
+const followupQuestion1 = makeFollowupQuestion(followupOrder[0], 1);
+const followupQuestion2 = makeFollowupQuestion(followupOrder[1], 2);
 
 // --------------------
 // Feedback
@@ -404,39 +460,40 @@ const memorizationAndTestLoop = {
     ...memorizationBlock,
     recallIntro,
     recallTest,
-
     {
-      timeline: [followupIntro, followupQuestion],
+      timeline: [followupIntro, followupQuestion1, followupQuestion2],
       conditional_function: function() {
         const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
         return lastRecall && lastRecall.correct === true;
       }
     },
-
     {
       timeline: [successScreen],
       conditional_function: function() {
         const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
-        const lastFollowup = jsPsych.data.get().filter({ phase: "followup" }).last(1).values()[0];
+        const lastTwoFollowups = jsPsych.data.get().filter({ phase: "followup" }).last(2).values();
 
         return lastRecall &&
                lastRecall.correct === true &&
-               lastFollowup &&
-               lastFollowup.correct === true;
+               lastTwoFollowups.length === 2 &&
+               lastTwoFollowups.every(trial => trial.correct === true);
       }
     },
-
     {
       timeline: [retryScreen],
       conditional_function: function() {
         const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
-        const lastFollowup = jsPsych.data.get().filter({ phase: "followup" }).last(1).values()[0];
+        const lastTwoFollowups = jsPsych.data.get().filter({ phase: "followup" }).last(2).values();
 
         if (!lastRecall || lastRecall.correct === false) {
           return true;
         }
 
-        if (!lastFollowup || lastFollowup.correct === false) {
+        if (lastTwoFollowups.length < 2) {
+          return true;
+        }
+
+        if (!lastTwoFollowups.every(trial => trial.correct === true)) {
           return true;
         }
 
@@ -444,16 +501,19 @@ const memorizationAndTestLoop = {
       }
     }
   ],
-
   loop_function: function() {
     const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
-    const lastFollowup = jsPsych.data.get().filter({ phase: "followup" }).last(1).values()[0];
+    const lastTwoFollowups = jsPsych.data.get().filter({ phase: "followup" }).last(2).values();
 
     if (!lastRecall || lastRecall.correct === false) {
       return true;
     }
 
-    if (!lastFollowup || lastFollowup.correct === false) {
+    if (lastTwoFollowups.length < 2) {
+      return true;
+    }
+
+    if (!lastTwoFollowups.every(trial => trial.correct === true)) {
       return true;
     }
 
@@ -461,4 +521,10 @@ const memorizationAndTestLoop = {
   }
 };
 
-jsPsych.run([welcome, memorizationAndTestLoop]);
+jsPsych.run([
+  welcomePage,
+  enterFullscreen,
+  instructionPage,
+  memorizationIntro,
+  memorizationAndTestLoop
+]);
