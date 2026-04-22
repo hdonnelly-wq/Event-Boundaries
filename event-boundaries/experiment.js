@@ -4,6 +4,11 @@ const jsPsych = initJsPsych({
   }
 });
 
+const subject_id = jsPsych.randomization.randomID(10);
+const filename = `${subject_id}.csv`;
+
+const MAX_RECALL_ATTEMPTS = 5;
+
 // --------------------
 // Random condition assignment: 2 x 2
 // --------------------
@@ -258,7 +263,44 @@ const followupChoiceOrder = jsPsych.randomization.shuffle(
     : recallColorOptions.map(color => color.name)
 );
 
+const thankYouScreen = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <div style="font-size: 30px; line-height: 1.6;">
+      <p>Thank you for participating.</p>
+      <p>Press any key to continue to the next page to hear more about the experiment.</p>
+    </div>
+  `
+};
+
+const debriefScreen = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <div style="font-size: 28px; line-height: 1.6; max-width: 900px; margin: auto;">
+      <p>This experiment was about event boundaries and memory.</p>
+      <p>We were interested in how breaking a sequence into parts may affect how people remember the items and what comes next.</p>
+      <p>In particular, we were comparing performance across conditions with and without a boundary in the middle of the sequence.</p>
+      <p>Thank you again for your participation.</p>
+      <p>Press any key to finish.</p>
+    </div>
+  `,
+  on_finish: function() {
+    jsPsych.endExperiment("Debrief complete.");
+  }
+};
+
+const save_data = {
+  type: jsPsychPipe,
+  action: "save",
+  experiment_id: "I7nBLeeGRdNK",
+  filename: filename,
+  data_string: ()=>jsPsych.data.get().csv()
+};
+            
+
+
 jsPsych.data.addProperties({
+  subject_id: subject_id,
   condition: condition,
   stimulus_type: stimulusType,
   barrier_condition: hasBarrier ? "barrier" : "no_barrier",
@@ -510,7 +552,7 @@ const enterFullscreen = {
   message: `
     <div style="font-size: 28px; line-height: 1.6;">
       <p>The experiment will now switch to full screen mode.</p>
-      <p>Please click the button below to continue.</p>
+      <p>Please click any key below to continue.</p>
     </div>
   `,
   button_label: "Enter Full Screen",
@@ -525,10 +567,13 @@ const instructionPage = {
       <p>After two memorization rounds, you will type the full sequence in order.</p>
       <p>If that is correct, you will answer two follow-up questions.</p>
       <p>If you get anything wrong, you will repeat the memorization rounds.</p>
+      <p>You will have 5 chances to provide the correct sequence.</p>
       <p>Press any key to begin.</p>
     </div>
   `
 };
+
+
 
 const memorizationIntro = {
   type: jsPsychHtmlKeyboardResponse,
@@ -669,10 +714,11 @@ const recallTest = stimulusType === "numbers"
       ],
       button_label: "Submit",
       data: {
-        phase: "recall",
-        correct_sequence: getFullSequenceCorrectString(),
-        stimulus_type: stimulusType
-      },
+      phase: "recall",
+      correct_sequence: getFullSequenceCorrectString(),
+      stimulus_type: stimulusType,
+      attempt_number: jsPsych.data.get().filter({ phase: "recall" }).count() + 1
+},
       on_finish: function(data) {
         const typedRaw = data.response.typed_sequence;
         const typedNormalized = normalizeRecallInput(typedRaw);
@@ -729,10 +775,11 @@ const recallTest = stimulusType === "numbers"
       `,
       button_label: "Submit",
       data: {
-        phase: "recall",
-        correct_sequence: getFullSequenceCorrectString(),
-        stimulus_type: stimulusType
-      },
+  phase: "recall",
+  correct_sequence: getFullSequenceCorrectString(),
+  stimulus_type: stimulusType,
+  attempt_number: jsPsych.data.get().filter({ phase: "recall" }).count() + 1
+},
       on_load: function() {
         window.colorRecallSelection = [];
         updateColorRecallDisplay();
@@ -788,7 +835,10 @@ function makeFollowupQuestion(probeInfo, questionNumber) {
       },
       on_finish: function(data) {
         const selectedNumber = followupChoiceOrder[data.response_index];
+        const correctAnswer = getFollowupCorrectResponse(probeInfo.cuePosition);
+
         data.followup_response = selectedNumber || "";
+        data.accuracy = selectedNumber === correctAnswer ? 1 : 0;
       }
     };
   }
@@ -814,10 +864,14 @@ function makeFollowupQuestion(probeInfo, questionNumber) {
     },
     on_finish: function(data) {
       const selectedColorName = followupChoiceOrder[data.response_index];
+      const correctAnswer = getFollowupCorrectResponse(probeInfo.cuePosition);
+
       data.followup_response = selectedColorName || "";
+      data.accuracy = selectedColorName === correctAnswer ? 1 : 0;
     }
   };
 }
+  
 
 const followupQuestion1 = makeFollowupQuestion(followupOrder[0], 1);
 const followupQuestion2 = makeFollowupQuestion(followupOrder[1], 2);
@@ -833,6 +887,19 @@ const successScreen = {
       <p>Press any key to finish.</p>
     </div>
   `
+};
+
+const maxAttemptsEndScreen = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <div style="font-size: 30px; line-height: 1.6;">
+      <p>Thank you for participating.</p>
+      <p>Press any key to finish.</p>
+    </div>
+  `,
+  on_finish: function() {
+    jsPsych.endExperiment("Maximum recall attempts reached.");
+  }
 };
 
 const retryScreen = {
@@ -862,7 +929,7 @@ const memorizationAndTestLoop = {
       }
     },
     {
-  timeline: [successScreen],
+  timeline: [thankYouScreen, save_data, debriefScreen],
   conditional_function: function() {
     const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
     const lastTwoFollowups = jsPsych.data.get().filter({ phase: "followup" }).last(2).values();
@@ -872,23 +939,47 @@ const memorizationAndTestLoop = {
            lastTwoFollowups.length === 2;
   }
 },
-   {
-  timeline: [retryScreen],
-  conditional_function: function() {
-    const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
-    return !lastRecall || lastRecall.correct === false;
-  }
-}
+    {
+      timeline: [retryScreen],
+      conditional_function: function() {
+        const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
+        const recallCount = jsPsych.data.get().filter({ phase: "recall" }).count();
+
+        return lastRecall &&
+               lastRecall.correct === false &&
+               recallCount < MAX_RECALL_ATTEMPTS;
+      }
+    },
+    {
+      timeline: [maxAttemptsEndScreen],
+      conditional_function: function() {
+        const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
+        const recallCount = jsPsych.data.get().filter({ phase: "recall" }).count();
+
+        return lastRecall &&
+               lastRecall.correct === false &&
+               recallCount >= MAX_RECALL_ATTEMPTS;
+      }
+    }
   ],
   loop_function: function() {
-  const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
+    const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
+    const recallCount = jsPsych.data.get().filter({ phase: "recall" }).count();
 
-  if (!lastRecall || lastRecall.correct === false) {
+    if (!lastRecall) {
+      return true;
+    }
+
+    if (lastRecall.correct === true) {
+      return false;
+    }
+
+    if (recallCount >= MAX_RECALL_ATTEMPTS) {
+      return false;
+    }
+
     return true;
   }
-
-  return false;
-}
 };
 
 jsPsych.run([
