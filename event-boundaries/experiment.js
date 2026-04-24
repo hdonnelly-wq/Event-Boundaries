@@ -318,8 +318,8 @@ const debriefScreen = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
     <div style="font-size: 28px; line-height: 1.6; max-width: 900px; margin: auto;">
-      <p>This experiment was about event boundaries and memory.</p>
-      <p>We were interested in how breaking a sequence into parts may affect how people remember the items and what comes next.</p>
+      <p>We are studying the impact of “event boundaries” on the process of memory recall.</p>
+      <p>We will use data from your responses to analyze the effects of introducing artificial breaks in sequences—which you may have noticed if your screen went black halfway through the memory rounds—on this recall process.</p>
       <p>In particular, we were comparing performance across conditions with and without a boundary in the middle of the sequence.</p>
       <p>Thank you again for your participation.</p>
       <p>Press any key to continue.</p>
