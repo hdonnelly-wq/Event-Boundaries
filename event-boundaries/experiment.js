@@ -60,7 +60,7 @@ const colorBlindnessTest = {
     </div>
   `,
   html: `
-    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; max-width: 700px; margin: 0 auto; font-size: 22px; text-align: left;">
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; max-width: 700px; margin: 0 auto; font-size: 22px; text-align: left;">
       <div>
         <label for="cb_1">Top Left:</label><br>
         <input id="cb_1" name="cb_1" type="text" required style="font-size: 22px; width: 100%; padding: 8px;">
@@ -130,18 +130,32 @@ const colorBlindnessPassScreen = {
 };
 
 const colorBlindnessFailScreen = {
-  type: jsPsychHtmlButtonResponse,
+  type: jsPsychHtmlKeyboardResponse,
   stimulus: `
     <div style="font-size: 30px; line-height: 1.6;">
-      <p>Fail</p>
-      <p>Unfortunately, you are not eligible to continue with this experiment.</p>
-      <p>The experiment will now end.</p>
+      <p>Thank you for participating.</p>
+      <p>Press any key to finish.</p>
+    </div>
+  `
+};
+
+const save_data = {
+  type: jsPsychPipe,
+  action: "save",
+  experiment_id: "I7nBLeeGRdNK",
+  filename: filename,
+  data_string: () => jsPsych.data.get().csv()
+};
+
+const finalEndScreen = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <div style="font-size: 30px; line-height: 1.6;">
+      <p>Thank you for participating.</p>
+      <p>You may now close this page.</p>
     </div>
   `,
-  choices: ["End experiment"],
-  on_finish: function() {
-    jsPsych.endExperiment("Screening failed.");
-  }
+  choices: "NO_KEYS"
 };
 
 const colorBlindnessScreeningBlock = {
@@ -156,7 +170,7 @@ const colorBlindnessScreeningBlock = {
       }
     },
     {
-      timeline: [colorBlindnessFailScreen],
+      timeline: [colorBlindnessFailScreen, save_data, finalEndScreen],
       conditional_function: function() {
         const lastScreen = jsPsych.data.get().filter({ phase: "color_blindness_screen" }).last(1).values()[0];
         return lastScreen && lastScreen.passed === false;
@@ -289,13 +303,7 @@ const debriefScreen = {
   }
 };
 
-const save_data = {
-  type: jsPsychPipe,
-  action: "save",
-  experiment_id: "I7nBLeeGRdNK",
-  filename: filename,
-  data_string: ()=>jsPsych.data.get().csv()
-};
+
             
 
 
@@ -905,10 +913,7 @@ const maxAttemptsEndScreen = {
       <p>Thank you for participating.</p>
       <p>Press any key to finish.</p>
     </div>
-  `,
-  on_finish: function() {
-    jsPsych.endExperiment("Maximum recall attempts reached.");
-  }
+  `
 };
 
 const retryScreen = {
@@ -960,7 +965,7 @@ const memorizationAndTestLoop = {
       }
     },
     {
-      timeline: [maxAttemptsEndScreen],
+      timeline: [maxAttemptsEndScreen, save_data, finalEndScreen],
       conditional_function: function() {
         const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
         const recallCount = jsPsych.data.get().filter({ phase: "recall" }).count();
