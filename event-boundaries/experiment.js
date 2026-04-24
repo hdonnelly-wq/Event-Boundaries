@@ -812,6 +812,15 @@ const followupIntro = {
   `
 };
 
+const followupTransitionScreen = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <div style="font-size: 28px; line-height: 1.6;">
+      <p>Press any key to get to the next question.</p>
+    </div>
+  `
+};
+
 // --------------------
 // Follow-up question builder
 // --------------------
@@ -922,7 +931,7 @@ const memorizationAndTestLoop = {
     recallIntro,
     recallTest,
     {
-      timeline: [followupIntro, followupQuestion1, followupQuestion2],
+      timeline: [followupIntro, followupQuestion1, followupTransitionScreen, followupQuestion2],
       conditional_function: function() {
         const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
         return lastRecall && lastRecall.correct === true;
