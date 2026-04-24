@@ -10,6 +10,7 @@ const jsPsych = initJsPsych({
   var prolific_id = jsPsych.data.getURLVariable('PROLIFIC_PID');
   var study_id = jsPsych.data.getURLVariable('STUDY_ID');
   var session_id = jsPsych.data.getURLVariable('SESSION_ID');
+  
 
   jsPsych.data.addProperties({
     prolific_id: prolific_id,
@@ -171,6 +172,19 @@ const finalEndScreen = {
   choices: "NO_KEYS"
 };
 
+const final_trial = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <p>You've finished the last task. Thanks for participating!</p>
+    <p>
+      <a href="https://app.prolific.com/submissions/complete?cc=CILKXMIQ">
+        Click here to return to Prolific and complete the study
+      </a>.
+    </p>
+  `,
+  choices: "NO_KEYS"
+};
+
 const colorBlindnessScreeningBlock = {
   timeline: [
     colorBlindnessIntro,
@@ -183,7 +197,7 @@ const colorBlindnessScreeningBlock = {
       }
     },
     {
-      timeline: [colorBlindnessFailScreen, save_data, finalEndScreen],
+      timeline: [colorBlindnessFailScreen, save_data, final_trial],
       conditional_function: function() {
         const lastScreen = jsPsych.data.get().filter({ phase: "color_blindness_screen" }).last(1).values()[0];
         return lastScreen && lastScreen.passed === false;
@@ -247,7 +261,7 @@ const colorSequences = [
 
 const recallColorOptions = [
   { name: "red",    hex: "#e53935" },
-  { name: "pink",   hex: "#d81b60" },
+  { name: "pink",   hex: "#ec6a9a" },
   { name: "orange", hex: "#fb8c00" },
   { name: "yellow", hex: "#fdd835" },
   { name: "green",  hex: "#43a047" },
@@ -308,12 +322,9 @@ const debriefScreen = {
       <p>We were interested in how breaking a sequence into parts may affect how people remember the items and what comes next.</p>
       <p>In particular, we were comparing performance across conditions with and without a boundary in the middle of the sequence.</p>
       <p>Thank you again for your participation.</p>
-      <p>Press any key to finish.</p>
+      <p>Press any key to continue.</p>
     </div>
-  `,
-  on_finish: function() {
-    jsPsych.endExperiment("Debrief complete.");
-  }
+  `
 };
 
 
@@ -636,14 +647,19 @@ function makeStudyRound(runNumber) {
   let roundTimeline = [];
 
   roundTimeline.push({
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: `
-      <div style="font-size: 28px; line-height: 1.6;">
-        <p>Memorization round ${runNumber} of 2</p>
-        <p>Press any key to begin.</p>
-      </div>
-    `
-  });
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <div style="font-size: 28px; line-height: 1.6;">
+      <p>Memorization round ${runNumber} of 2</p>
+      <p>
+        ${runNumber === 2
+          ? `You will see the same sequence of ${stimulusType === "numbers" ? "numbers" : "colors"} again.`
+          : `Press any key to begin.`}
+      </p>
+      ${runNumber === 2 ? `<p>Press any key to begin.</p>` : ``}
+    </div>
+  `
+});
 
   for (let i = 0; i < studyItems.length; i++) {
     const item = studyItems[i];
@@ -734,7 +750,17 @@ const recallTest = stimulusType === "numbers"
         }
       ],
       button_label: "Submit",
-      data: {
+button_html: `
+  <button class="jspsych-btn" style="
+    font-size: 26px;
+    padding: 16px 34px;
+    margin-top: 18px;
+    font-weight: 700;
+  ">
+    %choice%
+  </button>
+`,
+data: {
       phase: "recall",
       correct_sequence: getFullSequenceCorrectString(),
       stimulus_type: stimulusType,
@@ -786,12 +812,12 @@ const recallTest = stimulusType === "numbers"
           </div>
 
           <button
-            type="button"
-            onclick="window.clearColorRecallSelection()"
-            style="font-size: 20px; padding: 10px 18px; margin-top: 8px;"
-          >
-            Clear response
-          </button>
+  type="button"
+  onclick="window.clearColorRecallSelection()"
+  style="font-size: 18px; padding: 8px 14px; margin-top: 8px;"
+>
+  Clear response
+</button>
         </div>
       `,
       button_label: "Submit",
@@ -978,7 +1004,7 @@ const memorizationAndTestLoop = {
       }
     },
     {
-  timeline: [thankYouScreen, save_data, debriefScreen],
+  timeline: [thankYouScreen, save_data, debriefScreen, final_trial],
   conditional_function: function() {
     const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
     const lastTwoFollowups = jsPsych.data.get().filter({ phase: "followup" }).last(2).values();
@@ -1000,7 +1026,7 @@ const memorizationAndTestLoop = {
       }
     },
     {
-      timeline: [maxAttemptsEndScreen, save_data, finalEndScreen],
+      timeline: [maxAttemptsEndScreen, save_data, final_trial],
       conditional_function: function() {
         const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
         const recallCount = jsPsych.data.get().filter({ phase: "recall" }).count();
