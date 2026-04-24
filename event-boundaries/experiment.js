@@ -4,6 +4,19 @@ const jsPsych = initJsPsych({
   }
 });
 
+
+
+  // capture info from Prolific
+  var prolific_id = jsPsych.data.getURLVariable('PROLIFIC_PID');
+  var study_id = jsPsych.data.getURLVariable('STUDY_ID');
+  var session_id = jsPsych.data.getURLVariable('SESSION_ID');
+
+  jsPsych.data.addProperties({
+    prolific_id: prolific_id,
+    study_id: study_id,
+    session_id: session_id
+  });
+
 const subject_id = jsPsych.randomization.randomID(10);
 const filename = `${subject_id}.csv`;
 
@@ -192,7 +205,7 @@ const numberSequences = [
 const colorSequences = [
   [
     { name: "green",  hex: "#43a047", key: "g" },
-    { name: "pink",   hex: "#d81b60", key: "i" },
+    { name: "pink",   hex: "#ec6a9a", key: "i" },
     { name: "brown",  hex: "#6d4c41", key: "w" },
     { name: "yellow", hex: "#fdd835", key: "y" },
     { name: "blue",   hex: "#1e88e5", key: "b" },
@@ -205,7 +218,7 @@ const colorSequences = [
     { name: "red",    hex: "#e53935", key: "r" },
     { name: "brown",  hex: "#6d4c41", key: "w" },
     { name: "yellow", hex: "#fdd835", key: "y" },
-    { name: "pink",   hex: "#d81b60", key: "i" },
+    { name: "pink",   hex: "#ec6a9a", key: "i" },
     { name: "green",  hex: "#43a047", key: "g" },
     { name: "orange", hex: "#fb8c00", key: "o" },
     { name: "purple", hex: "#8e24aa", key: "p" }
@@ -213,7 +226,7 @@ const colorSequences = [
   [
     { name: "green",  hex: "#43a047", key: "g" },
     { name: "blue",   hex: "#1e88e5", key: "b" },
-    { name: "pink",   hex: "#d81b60", key: "i" },
+    { name: "pink",   hex: "#ec6a9a", key: "i" },
     { name: "red",    hex: "#e53935", key: "r" },
     { name: "yellow", hex: "#fdd835", key: "y" },
     { name: "brown",  hex: "#6d4c41", key: "w" },
@@ -222,7 +235,7 @@ const colorSequences = [
   ], // Seq 3
   [
     { name: "green",  hex: "#43a047", key: "g" },
-    { name: "pink",   hex: "#d81b60", key: "i" },
+    { name: "pink",   hex: "#ec6a9a", key: "i" },
     { name: "yellow", hex: "#fdd835", key: "y" },
     { name: "brown",  hex: "#6d4c41", key: "w" },
     { name: "red",    hex: "#e53935", key: "r" },
@@ -820,6 +833,21 @@ const followupIntro = {
   `
 };
 
+const followupInstructionScreen = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <div style="font-size: 28px; line-height: 1.6;">
+      <p>
+        A ${stimulusType === "numbers" ? "number" : "color"} will appear in the center of your screen.
+      </p>
+      <p>
+        Click the ${stimulusType === "numbers" ? "number" : "color"} that follows it in the sequence.
+      </p>
+      <p>Press any key to continue.</p>
+    </div>
+  `
+};
+
 const followupTransitionScreen = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: `
@@ -936,7 +964,14 @@ const memorizationAndTestLoop = {
     recallIntro,
     recallTest,
     {
-      timeline: [followupIntro, followupQuestion1, followupTransitionScreen, followupQuestion2],
+      timeline: [
+  followupIntro,
+  followupInstructionScreen,
+  followupQuestion1,
+  followupTransitionScreen,
+  followupInstructionScreen,
+  followupQuestion2
+],
       conditional_function: function() {
         const lastRecall = jsPsych.data.get().filter({ phase: "recall" }).last(1).values()[0];
         return lastRecall && lastRecall.correct === true;
