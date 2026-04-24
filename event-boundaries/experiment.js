@@ -566,7 +566,7 @@ const instructionPage = {
       <p>You will study a sequence of 8 ${stimulusType === "numbers" ? "numbers" : "colors"}.</p>
       <p>After two memorization rounds, you will type the full sequence in order.</p>
       <p>If that is correct, you will answer two follow-up questions.</p>
-      <p>If you get anything wrong, you will repeat the memorization rounds.</p>
+      <p>If you get the sequence wrong, you will repeat the memorization rounds.</p>
       <p>You will have 5 chances to provide the correct sequence.</p>
       <p>Press any key to begin.</p>
     </div>
